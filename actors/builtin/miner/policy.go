@@ -171,8 +171,8 @@ var consensusFaultReporterInitialShare = BigFrac{
 }
 var consensusFaultReporterShareGrowthRate = BigFrac{
 	// PARAM_FINISH
-	numerator:   big.NewInt(101251),
-	denominator: big.NewInt(100000),
+	numerator:   big.NewInt(1004356),
+	denominator: big.NewInt(1000000),
 }
 
 // Specification for a linear vesting schedule.
@@ -201,7 +201,7 @@ func RewardForConsensusSlashReport(elapsedEpoch abi.ChainEpoch, collateral abi.T
 	// PARAM_FINISH
 	// var growthRate = SLASHER_SHARE_GROWTH_RATE_NUM / SLASHER_SHARE_GROWTH_RATE_DENOM
 	// var multiplier = growthRate^elapsedEpoch
-	// var slasherProportion = min(INITIAL_SLASHER_SHARE * multiplier, 1.0)
+	// var slasherProportion = min(INITIAL_SLASHER_SHARE * multiplier, 0.05)
 	// return collateral * slasherProportion
 
 	// BigInt Operation
@@ -209,7 +209,7 @@ func RewardForConsensusSlashReport(elapsedEpoch abi.ChainEpoch, collateral abi.T
 	// DENOM = SLASHER_SHARE_GROWTH_RATE_DENOM^elapsedEpoch * INITIAL_SLASHER_SHARE_DENOM
 	// slasher_amount = min(NUM/DENOM, collateral)
 	maxReporterShareNum := big.NewInt(1)
-	maxReporterShareDen := big.NewInt(2)
+	maxReporterShareDen := big.NewInt(20)
 
 	elapsed := big.NewInt(int64(elapsedEpoch))
 	slasherShareNumerator := big.Exp(consensusFaultReporterShareGrowthRate.numerator, elapsed)
