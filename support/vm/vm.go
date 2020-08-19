@@ -13,7 +13,7 @@ import (
 	"github.com/filecoin-project/specs-actors/actors/runtime/exitcode"
 	"github.com/filecoin-project/specs-actors/actors/util/adt"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-hamt-ipld"
+	"github.com/filecoin-project/go-hamt-ipld"
 	"github.com/pkg/errors"
 )
 
