@@ -48,6 +48,9 @@ const SectorsMax = 32 << 20 // PARAM_FINISH
 // We set this to same as MaxPartitionsPerDeadline so we can process that many partitions every deadline.
 const AddressedPartitionsMax = MaxPartitionsPerDeadline
 
+// Maximum number of unique "declarations" in batch operations.
+const DeclarationsMax = AddressedPartitionsMax
+
 // The maximum number of sector infos that may be required to be loaded in a single invocation.
 const AddressedSectorsMax = 10_000
 
