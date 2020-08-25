@@ -1058,7 +1058,7 @@ func bf(secNos ...uint64) bitfield.BitField {
 }
 
 func selectSectors(t *testing.T, sectors []*miner.SectorOnChainInfo, field bitfield.BitField) []*miner.SectorOnChainInfo {
-	toInclude, err := field.AllMap(miner.SectorsMax)
+	toInclude, err := field.AllMap(miner.AddressedSectorsMax)
 	require.NoError(t, err)
 
 	included := []*miner.SectorOnChainInfo{}
@@ -1081,7 +1081,7 @@ func emptyPartition(t *testing.T, store adt.Store) *miner.Partition {
 }
 
 func rescheduleSectors(t *testing.T, target abi.ChainEpoch, sectors []*miner.SectorOnChainInfo, filter bitfield.BitField) []*miner.SectorOnChainInfo {
-	toReschedule, err := filter.AllMap(miner.SectorsMax)
+	toReschedule, err := filter.AllMap(miner.AddressedSectorsMax)
 	require.NoError(t, err)
 	output := make([]*miner.SectorOnChainInfo, len(sectors))
 	for i, sector := range sectors {
