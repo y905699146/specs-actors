@@ -383,7 +383,7 @@ func TestCommitments(t *testing.T) {
 		// Use the max sector number to make sure everything works.
 		sectorNo := abi.SectorNumber(abi.MaxSectorNumber)
 		expiration := dlInfo.PeriodEnd() + defaultSectorExpiration*miner.WPoStProvingPeriod // something on deadline boundary but > 180 days
-		precommit := actor.makePreCommit(sectorNo, precommitEpoch-1, expiration, nil)
+		precommit := actor.makePreCommit(sectorNo, precommitEpoch-1, expiration, []abi.DealID{1})
 		actor.preCommitSector(rt, precommit)
 
 		// assert precommit exists and meets expectations
@@ -394,8 +394,8 @@ func TestCommitments(t *testing.T) {
 		require.NoError(t, err)
 
 		// deal weights mocked by actor harness for market actor must be set in precommit onchain info
-		assert.Equal(t, big.NewInt(int64(sectorSize/2)), onChainPrecommit.DealWeight)
-		assert.Equal(t, big.NewInt(int64(sectorSize/2)), onChainPrecommit.VerifiedDealWeight)
+		assert.Equal(t, actor.precommitDealWeight, onChainPrecommit.DealWeight)
+		assert.Equal(t, actor.precommitVerifiedDealWeight, onChainPrecommit.VerifiedDealWeight)
 
 		qaPower := miner.QAPowerForWeight(sectorSize, precommit.Expiration-precommitEpoch, onChainPrecommit.DealWeight, onChainPrecommit.VerifiedDealWeight)
 		expectedDeposit := miner.PreCommitDepositForPower(actor.epochRewardSmooth, actor.epochQAPowerSmooth, qaPower)
@@ -429,9 +429,9 @@ func TestCommitments(t *testing.T) {
 		sector := actor.getSector(rt, sectorNo)
 		sectorPower := miner.PowerForSector(sectorSize, sector)
 
-		// expect deal weights to be transfered to on chain info
-		assert.Equal(t, onChainPrecommit.DealWeight, sector.DealWeight)
-		assert.Equal(t, onChainPrecommit.VerifiedDealWeight, sector.VerifiedDealWeight)
+		// expect deal weights to be recomputed
+		assert.Equal(t, actor.dealWeight, sector.DealWeight)
+		assert.Equal(t, actor.verifiedDealWeight, sector.VerifiedDealWeight)
 
 		// expect activation epoch to be current epoch
 		assert.Equal(t, rt.Epoch(), sector.Activation)
@@ -1649,25 +1649,25 @@ func TestDeadlineCron(t *testing.T) {
 		// setup state to simulate moving forward all the way to expiry
 		dlIdx, _, err := st.FindSector(rt.AdtStore(), sectors[0].SectorNumber)
 		require.NoError(t, err)
-		expirationPeriod := (expiration / miner.WPoStProvingPeriod + 1)*miner.WPoStProvingPeriod
+		expirationPeriod := (expiration/miner.WPoStProvingPeriod + 1) * miner.WPoStProvingPeriod
 		st.ProvingPeriodStart = expirationPeriod
 		st.CurrentDeadline = dlIdx
 		rt.ReplaceState(st)
 
 		// Advance to expiration epoch and expect expiration during cron
-		rt.SetEpoch(expiration)	
+		rt.SetEpoch(expiration)
 		powerDelta := activePower.Neg()
 		// because we skip forward in state and don't post we incur SP
-		expectedFee := actor.undeclaredFaultPenalty(sectors) 
+		expectedFee := actor.undeclaredFaultPenalty(sectors)
 		// Add lots of funds so expectedFee is taken from locked funds
 		initialLocked := big.Mul(big.NewInt(400), big.NewInt(1e18))
 		actor.addLockedFunds(rt, initialLocked)
 
 		advanceDeadline(rt, actor, &cronConfig{
-			expectedEnrollment: rt.Epoch() + miner.WPoStChallengeWindow,
-			expiredSectorsPowerDelta: &powerDelta,
+			expectedEnrollment:        rt.Epoch() + miner.WPoStChallengeWindow,
+			expiredSectorsPowerDelta:  &powerDelta,
 			expiredSectorsPledgeDelta: initialPledge.Neg(),
-			detectedFaultsPenalty: expectedFee,
+			detectedFaultsPenalty:     expectedFee,
 		})
 	})
 
@@ -1687,7 +1687,7 @@ func TestDeadlineCron(t *testing.T) {
 		// setup state to simulate moving forward all the way to expiry
 		dlIdx, _, err := st.FindSector(rt.AdtStore(), sectors[0].SectorNumber)
 		require.NoError(t, err)
-		expirationPeriod := (expiration / miner.WPoStProvingPeriod + 1)*miner.WPoStProvingPeriod
+		expirationPeriod := (expiration/miner.WPoStProvingPeriod + 1) * miner.WPoStProvingPeriod
 		st.ProvingPeriodStart = expirationPeriod
 		st.CurrentDeadline = dlIdx
 
@@ -1697,23 +1697,23 @@ func TestDeadlineCron(t *testing.T) {
 		rt.ReplaceState(st)
 
 		// Advance to expiration epoch and expect expiration during cron
-		rt.SetEpoch(expiration)	
+		rt.SetEpoch(expiration)
 		powerDelta := activePower.Neg()
 
 		// because we skip forward in state and don't post we incur SP
-		expectedFee := actor.undeclaredFaultPenalty(sectors) 
+		expectedFee := actor.undeclaredFaultPenalty(sectors)
 		// Add lots of funds to locked funds so expectedFee is taken from locked funds
 		actor.addLockedFunds(rt, expectedFee)
 
 		// Miner balance = LF + IP. expectedFee covered by LF, debt repayment covered by IP
-		rt.SetBalance(big.Add(expectedFee, st.InitialPledge)) 
+		rt.SetBalance(big.Add(expectedFee, st.InitialPledge))
 
 		advanceDeadline(rt, actor, &cronConfig{
-			expectedEnrollment: rt.Epoch() + miner.WPoStChallengeWindow,
-			expiredSectorsPowerDelta: &powerDelta,
+			expectedEnrollment:        rt.Epoch() + miner.WPoStChallengeWindow,
+			expiredSectorsPowerDelta:  &powerDelta,
 			expiredSectorsPledgeDelta: initialPledge.Neg(),
-			detectedFaultsPenalty: expectedFee,
-			repaidFeeDebt: initialPledge, // We repay unlocked IP as fees
+			detectedFaultsPenalty:     expectedFee,
+			repaidFeeDebt:             initialPledge, // We repay unlocked IP as fees
 		})
 	})
 
@@ -3090,6 +3090,11 @@ type actorHarness struct {
 
 	epochRewardSmooth  *smoothing.FilterEstimate
 	epochQAPowerSmooth *smoothing.FilterEstimate
+
+	precommitDealWeight         abi.DealWeight
+	precommitVerifiedDealWeight abi.DealWeight
+	dealWeight                  abi.DealWeight
+	verifiedDealWeight          abi.DealWeight
 }
 
 func newHarness(t testing.TB, provingPeriodOffset abi.ChainEpoch) *actorHarness {
@@ -3124,6 +3129,11 @@ func newHarness(t testing.TB, provingPeriodOffset abi.ChainEpoch) *actorHarness 
 
 		epochRewardSmooth:  smoothing.TestingConstantEstimate(rwd),
 		epochQAPowerSmooth: smoothing.TestingConstantEstimate(pwr),
+
+		precommitDealWeight:         big.NewInt(1 << 29),
+		precommitVerifiedDealWeight: big.NewInt(1 << 28),
+		dealWeight:                  big.NewInt(1<<29 - 1),
+		verifiedDealWeight:          big.NewInt(1<<28 - 1),
 	}
 	h.setProofType(abi.RegisteredSealProof_StackedDrg32GiBV1)
 	return h
@@ -3403,18 +3413,17 @@ func (h *actorHarness) preCommitSector(rt *mock.Runtime, params *miner.SectorPre
 		expectQueryNetworkInfo(rt, h)
 	}
 	{
-		sectorSize, err := params.SealProof.SectorSize()
-		require.NoError(h.t, err)
-
 		vdParams := market.VerifyDealsForActivationParams{
 			DealIDs:      params.DealIDs,
 			SectorStart:  rt.Epoch(),
 			SectorExpiry: params.Expiration,
 		}
-
-		vdReturn := market.VerifyDealsForActivationReturn{
-			DealWeight:         big.NewInt(int64(sectorSize / 2)),
-			VerifiedDealWeight: big.NewInt(int64(sectorSize / 2)),
+		vdReturn := market.VerifyDealsForActivationReturn{DealWeight: big.Zero(), VerifiedDealWeight: big.Zero()}
+		if len(params.DealIDs) > 0 {
+			vdReturn = market.VerifyDealsForActivationReturn{
+				DealWeight:         h.precommitDealWeight,
+				VerifiedDealWeight: h.precommitVerifiedDealWeight,
+			}
 		}
 		rt.ExpectSend(builtin.StorageMarketActorAddr, builtin.MethodsMarket.VerifyDealsForActivation, &vdParams, big.Zero(), &vdReturn, exitcode.Ok)
 	}
@@ -3502,7 +3511,12 @@ func (h *actorHarness) confirmSectorProofsValid(rt *mock.Runtime, conf proveComm
 		}
 
 		if len(precommit.DealIDs) > 0 {
-			rt.ExpectSend(builtin.StorageMarketActorAddr, builtin.MethodsMarket.ActivateDeals, &vdParams, big.Zero(), nil, exit)
+			// subtract 1 from each to demonstrate weights are recomputed on verify commit
+			vdReturn := &market.VerifyDealsForActivationReturn{
+				DealWeight:         h.dealWeight,
+				VerifiedDealWeight: h.verifiedDealWeight,
+			}
+			rt.ExpectSend(builtin.StorageMarketActorAddr, builtin.MethodsMarket.ActivateDeals, &vdParams, big.Zero(), vdReturn, exit)
 		}
 	}
 
@@ -3994,7 +4008,7 @@ func (h *actorHarness) onDeadlineCron(rt *mock.Runtime, config *cronConfig) {
 		// TODO this forces tests to take funds from locked funds instead of balance.
 		// We should make other cases possible by pushing complexity to the config
 		penaltyFromUnlocked := penaltyTotal
-		if  !config.repaidFeeDebt.Nil() && !config.repaidFeeDebt.IsZero() {
+		if !config.repaidFeeDebt.Nil() && !config.repaidFeeDebt.IsZero() {
 			penaltyFromUnlocked = big.Sub(penaltyFromUnlocked, config.repaidFeeDebt)
 		}
 		pledgeDelta = big.Sub(pledgeDelta, penaltyFromUnlocked)
