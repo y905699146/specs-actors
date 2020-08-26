@@ -3412,18 +3412,15 @@ func (h *actorHarness) preCommitSector(rt *mock.Runtime, params *miner.SectorPre
 	{
 		expectQueryNetworkInfo(rt, h)
 	}
-	{
+	if len(params.DealIDs) > 0 {
 		vdParams := market.VerifyDealsForActivationParams{
 			DealIDs:      params.DealIDs,
 			SectorStart:  rt.Epoch(),
 			SectorExpiry: params.Expiration,
 		}
-		vdReturn := market.VerifyDealsForActivationReturn{DealWeight: big.Zero(), VerifiedDealWeight: big.Zero()}
-		if len(params.DealIDs) > 0 {
-			vdReturn = market.VerifyDealsForActivationReturn{
-				DealWeight:         h.precommitDealWeight,
-				VerifiedDealWeight: h.precommitVerifiedDealWeight,
-			}
+		vdReturn := market.VerifyDealsForActivationReturn{
+			DealWeight:         h.precommitDealWeight,
+			VerifiedDealWeight: h.precommitVerifiedDealWeight,
 		}
 		rt.ExpectSend(builtin.StorageMarketActorAddr, builtin.MethodsMarket.VerifyDealsForActivation, &vdParams, big.Zero(), &vdReturn, exitcode.Ok)
 	}

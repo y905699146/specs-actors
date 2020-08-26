@@ -1980,18 +1980,23 @@ func requestUnsealedSectorCID(rt Runtime, proofType abi.RegisteredSealProof, dea
 
 func requestDealWeight(rt Runtime, dealIDs []abi.DealID, sectorStart, sectorExpiry abi.ChainEpoch) market.VerifyDealsForActivationReturn {
 	var dealWeights market.VerifyDealsForActivationReturn
-	ret, code := rt.Send(
-		builtin.StorageMarketActorAddr,
-		builtin.MethodsMarket.VerifyDealsForActivation,
-		&market.VerifyDealsForActivationParams{
-			DealIDs:      dealIDs,
-			SectorStart:  sectorStart,
-			SectorExpiry: sectorExpiry,
-		},
-		abi.NewTokenAmount(0),
-	)
-	builtin.RequireSuccess(rt, code, "failed to verify deals and get deal weight")
-	AssertNoError(ret.Into(&dealWeights))
+	if len(dealIDs) > 0 {
+		ret, code := rt.Send(
+			builtin.StorageMarketActorAddr,
+			builtin.MethodsMarket.VerifyDealsForActivation,
+			&market.VerifyDealsForActivationParams{
+				DealIDs:      dealIDs,
+				SectorStart:  sectorStart,
+				SectorExpiry: sectorExpiry,
+			},
+			abi.NewTokenAmount(0),
+		)
+		builtin.RequireSuccess(rt, code, "failed to verify deals and get deal weight")
+		AssertNoError(ret.Into(&dealWeights))
+	} else {
+		dealWeights.DealWeight = big.Zero()
+		dealWeights.VerifiedDealWeight = big.Zero()
+	}
 	return dealWeights
 
 }

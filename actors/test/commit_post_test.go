@@ -71,7 +71,7 @@ func TestCommitPoStFlow(t *testing.T) {
 		SubInvocations: []vm.ExpectInvocation{
 			{To: builtin.RewardActorAddr, Method: builtin.MethodsReward.ThisEpochReward},
 			{To: builtin.StoragePowerActorAddr, Method: builtin.MethodsPower.CurrentTotalPower},
-			{To: builtin.StorageMarketActorAddr, Method: builtin.MethodsMarket.VerifyDealsForActivation}},
+		},
 	}.Matches(t, v.Invocations()[0])
 
 	balances := vm.GetMinerBalances(t, v, minerAddrs.IDAddress)
